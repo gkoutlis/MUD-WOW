@@ -7,7 +7,7 @@ async def broadcast(message):
     for player in connected_players:
         try:
             await player.send(message)
-        except Exception:
+        except Exception as e:
             pass
 
 async def handler(websocket):
