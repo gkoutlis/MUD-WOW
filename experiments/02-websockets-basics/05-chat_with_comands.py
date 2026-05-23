@@ -20,9 +20,22 @@ async def handler(websocket):
     try:
         async for message in websocket:
             if message.startswith("/who"):
-
                 names = ", ".join(players.values())
                 await websocket.send(f"Online players: {names} ")
+            elif message.startswith("/help"):
+                commands = "/help, /who, /nick"
+                await websocket.send(commands)
+            elif message.startswith("/nick"):
+                parts = message.split(" ", 1)
+                if len(parts) < 2:
+                    await websocket.send(f"You must enter a name!")
+                    continue
+                new_name = parts[1]
+                players[websocket] = new_name
+                await broadcast(f"{name} is now known as {new_name}")
+                name = new_name
+
+
             elif message.startswith("/"):
                 await websocket.send("Unknown command")
 
