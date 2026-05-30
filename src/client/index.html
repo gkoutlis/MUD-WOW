@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- ===== Decorative background layers ===== -->
     <div class="bg-mist"></div>
     <div class="bg-runes"></div>
     <div class="particles">
@@ -16,9 +15,7 @@
         <span></span><span></span><span></span><span></span><span></span>
     </div>
 
-    <!-- ===== Main frame ===== -->
     <div class="frame">
-        <!-- Top emblem -->
         <header class="topbar">
             <div class="emblem">
                 <svg viewBox="0 0 64 64" width="48" height="48" aria-hidden="true">
@@ -47,7 +44,6 @@
         </header>
 
         <div class="main-grid">
-            <!-- ===== Left sidebar (mock for now) ===== -->
             <aside class="sidebar">
                 <div class="panel character-panel">
                     <div class="panel-header">
@@ -57,7 +53,7 @@
                         <span>Character</span>
                     </div>
                     <div class="panel-body">
-                        <div class="char-name">— Awaiting name —</div>
+                        <div class="char-name" id="charName">— Awaiting name —</div>
                         <div class="char-meta">Sentinel · Lv. 1</div>
                     </div>
                 </div>
@@ -95,13 +91,12 @@
                         <span>Location</span>
                     </div>
                     <div class="panel-body">
-                        <div class="loc-name">Unknown</div>
-                        <div class="loc-hint">Use <code>look</code> to observe</div>
+                        <div class="loc-name" id="locName">Unknown</div>
+                        <div class="loc-hint" id="locHint">Use <code>look</code> to observe</div>
                     </div>
                 </div>
             </aside>
 
-            <!-- ===== Main chat area ===== -->
             <main class="chat-area">
                 <div class="chat-frame">
                     <div class="frame-corner tl"></div>
@@ -113,7 +108,6 @@
             </main>
         </div>
 
-        <!-- ===== Input bar ===== -->
         <div class="input-area">
             <div class="input-ornament left"></div>
             <input id="input" type="text" placeholder="Speak, ranger…  (or use a command)" autocomplete="off">
@@ -128,12 +122,20 @@
     </div>
 
     <script>
-        // ===== References =====
+        // ===== Element references =====
         const statusEl = document.getElementById("status");
         const statusText = statusEl.querySelector(".status-text");
         const messagesEl = document.getElementById("messages");
         const inputEl = document.getElementById("input");
         const sendBtn = document.getElementById("sendBtn");
+        const charNameEl = document.getElementById("charName");
+        const locNameEl = document.getElementById("locName");
+        const locHintEl = document.getElementById("locHint");
+
+        // ===== Client state =====
+        // Tracks whether we are waiting for the user's first message (their name)
+        let awaitingName = false;
+        let playerName = null;
 
         // ===== Helper: add a message to the chat =====
         function addMessage(text, type = "") {
@@ -142,6 +144,13 @@
             div.textContent = text;
             messagesEl.appendChild(div);
             messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // ===== Helper: detect and extract room name from look output =====
+        // Look output starts with "== <Room Name> ==" on first line
+        function tryExtractRoomName(text) {
+            const match = text.match(/^==\s*(.+?)\s*==/);
+            return match ? match[1] : null;
         }
 
         // ===== WebSocket connection =====
@@ -156,7 +165,20 @@
         };
 
         ws.onmessage = (event) => {
-            addMessage(event.data);
+            const text = event.data;
+            addMessage(text);
+
+            // Detect name prompt — next thing user sends is their name
+            if (text.toLowerCase().includes("your name")) {
+                awaitingName = true;
+            }
+
+            // Detect room descriptions to update Location panel
+            const roomName = tryExtractRoomName(text);
+            if (roomName) {
+                locNameEl.textContent = roomName;
+                locHintEl.innerHTML = "Use <code>go &lt;dir&gt;</code> to travel";
+            }
         };
 
         ws.onclose = () => {
@@ -175,6 +197,22 @@
             const text = inputEl.value.trim();
             if (!text) return;
             if (ws.readyState !== WebSocket.OPEN) return;
+
+            // If we are awaiting the name, this message IS the name
+            if (awaitingName) {
+                playerName = text;
+                charNameEl.textContent = text;
+                awaitingName = false;
+            }
+
+            // Also detect /nick changes locally
+            if (text.startsWith("/nick ")) {
+                const newName = text.slice(6).trim();
+                if (newName) {
+                    playerName = newName;
+                    charNameEl.textContent = newName;
+                }
+            }
 
             ws.send(text);
             addMessage("» " + text, "self");
