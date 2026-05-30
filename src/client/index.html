@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MUD-WoW Client</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        #status {
+            padding: 10px 16px;
+            background: #2a2a2a;
+            border-left: 4px solid #888;
+            margin-bottom: 12px;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+
+        #status.connected { border-left-color: #4caf50; color: #4caf50; }
+        #status.disconnected { border-left-color: #f44336; color: #f44336; }
+
+        #messages {
+            flex: 1;
+            background: #0e0e0e;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 16px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .message {
+            padding: 6px 10px;
+            border-radius: 3px;
+            background: #1f1f1f;
+            border-left: 2px solid #444;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .message.system { border-left-color: #ffa726; color: #ffa726; font-style: italic; }
+        .message.self { border-left-color: #42a5f5; }
+
+        #input-area { display: flex; gap: 8px; }
+
+        #input {
+            flex: 1;
+            padding: 12px 16px;
+            background: #0e0e0e;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+        }
+
+        #input:focus { border-color: #42a5f5; }
+
+        #sendBtn {
+            padding: 12px 24px;
+            background: #42a5f5;
+            color: #0e0e0e;
+            border: none;
+            border-radius: 4px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #sendBtn:hover { background: #64b5f6; }
+        #sendBtn:disabled { background: #444; cursor: not-allowed; }
+
+        #messages::-webkit-scrollbar { width: 8px; }
+        #messages::-webkit-scrollbar-track { background: #0e0e0e; }
+        #messages::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="status" class="disconnected">Disconnected</div>
+
+    <div id="messages"></div>
+
+    <div id="input-area">
+        <input id="input" type="text" placeholder="Type a message or command..." autocomplete="off">
+        <button id="sendBtn" disabled>Send</button>
+    </div>
+
+    <script>
+        // ===== References στα HTML elements =====
+        const statusEl = document.getElementById("status");
+        const messagesEl = document.getElementById("messages");
+        const inputEl = document.getElementById("input");
+        const sendBtn = document.getElementById("sendBtn");
+
+        // ===== Helper: προσθέτει ένα μήνυμα στο messages area =====
+        function addMessage(text, type = "") {
+            const div = document.createElement("div");
+            div.className = "message" + (type ? " " + type : "");
+            div.textContent = text;
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // ===== Άνοιξε WebSocket σύνδεση στον τοπικό server =====
+        const ws = new WebSocket("ws://localhost:8765");
+
+        ws.onopen = () => {
+            statusEl.textContent = "Connected";
+            statusEl.className = "connected";
+            sendBtn.disabled = false;
+            inputEl.focus();
+            addMessage("[Connected to server]", "system");
+        };
+
+        ws.onmessage = (event) => {
+            addMessage(event.data);
+        };
+
+        ws.onclose = () => {
+            statusEl.textContent = "Disconnected";
+            statusEl.className = "disconnected";
+            sendBtn.disabled = true;
+            addMessage("[Disconnected from server]", "system");
+        };
+
+        ws.onerror = () => {
+            addMessage("[Connection error - is the server running?]", "system");
+        };
+
+        // ===== Στείλε μήνυμα στον server =====
+        function sendMessage() {
+            const text = inputEl.value.trim();
+            if (!text) return;
+            if (ws.readyState !== WebSocket.OPEN) return;
+
+            ws.send(text);
+            addMessage("> " + text, "self");
+            inputEl.value = "";
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+
+        inputEl.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
+    </script>
+</body>
+</html>
