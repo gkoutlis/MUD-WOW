@@ -1,6 +1,6 @@
 import asyncio
 from mud.player import Player
-from mud.world import players
+from mud.world import players, rooms
 from websockets.asyncio.server import serve
 
 
@@ -39,7 +39,18 @@ async def handler(websocket):
                 new_name = parts[1]
                 await broadcast(f"{player.name} is now known as {new_name}")
                 player.name = new_name
-
+            elif message == "look":
+                room = rooms[player.room]
+                exits_str = ", ".join(room.exits.keys())
+                players_here = [p.name for p in players.values() if p.room == player.room]
+                players_str = ", ".join(players_here)
+                output =(
+                    f"== {room.name} ==\n"
+                    f"{room.description}\n"
+                    f"Exits: {exits_str}\n"
+                    f"Players here: {players_str}"
+                )
+                await websocket.send(output)
 
             elif message.startswith("/"):
                 await websocket.send("Unknown command")
