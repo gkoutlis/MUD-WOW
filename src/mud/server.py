@@ -14,6 +14,14 @@ async def broadcast(message):
         except Exception:
             pass
 
+async def broadcast_to_room(room_name, message, exclude=None):
+    for ws, player in players.items():
+        if player.room == room_name and ws != exclude:
+            try:
+                await ws.send(message)
+            except Exception:
+                pass
+
 async def handler(websocket):
     await websocket.send("Whats your name?")
     name = await websocket.recv()
@@ -45,6 +53,31 @@ async def handler(websocket):
                 players_here = [p.name for p in players.values() if p.room == player.room]
                 players_str = ", ".join(players_here)
                 output =(
+                    f"== {room.name} ==\n"
+                    f"{room.description}\n"
+                    f"Exits: {exits_str}\n"
+                    f"Players here: {players_str}"
+                )
+                await websocket.send(output)
+            elif message.startswith("go"):
+                dir_parts = message.split(" ", 1)
+                if len(dir_parts) < 2:
+                    await websocket.send(f"You must enter a direction!")
+                    continue
+                direction = dir_parts[1]
+                current_room = rooms[player.room]
+                if direction not in current_room.exits:
+                    await websocket.send(f"You can't go that way!")
+                    continue
+                destination = current_room.exits[direction]
+                await broadcast_to_room(player.room, f"{player.name} left for {direction}", exclude=websocket)
+                player.room = destination
+                await broadcast_to_room(player.room, f"{player.name} arrived")
+                room = rooms[player.room]
+                exits_str = ", ".join(room.exits.keys())
+                players_here = [p.name for p in players.values() if p.room == player.room]
+                players_str = ", ".join(players_here)
+                output = (
                     f"== {room.name} ==\n"
                     f"{room.description}\n"
                     f"Exits: {exits_str}\n"
