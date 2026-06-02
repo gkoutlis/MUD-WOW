@@ -1,4 +1,4 @@
-from mud.room import Room
+from mud import Room
 
 rooms = {
     "tavern": Room(
